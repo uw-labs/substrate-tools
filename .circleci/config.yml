@@ -1,0 +1,17 @@
+version: 2
+
+jobs:
+  test:
+    working_directory: /go/src/github.com/uw-labs/substrate-tools
+    docker:
+      - image: circleci/golang:1
+    steps:
+      - checkout
+      - run: go mod download
+      - run: go test -v -race -cover ./...
+
+workflows:
+  version: 2
+  test:
+    jobs:
+      - test
