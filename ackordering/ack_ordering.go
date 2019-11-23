@@ -1,4 +1,4 @@
-package ordering
+package ackordering
 
 import (
 	"context"
@@ -9,9 +9,9 @@ import (
 	"github.com/uw-labs/sync/rungroup"
 )
 
-// NewAckOrderingMessageSource is a message source that accepts acknowledgements in any order and
+// NewAsyncMessageSource is a message source that accepts acknowledgements in any order and
 // forwards them to underlying source in the order in which the messages are read.
-func NewAckOrderingMessageSource(delegate substrate.AsyncMessageSource) substrate.AsyncMessageSource {
+func NewAsyncMessageSource(delegate substrate.AsyncMessageSource) substrate.AsyncMessageSource {
 	return &ackOrderingMiddleware{
 		delegate: delegate,
 	}

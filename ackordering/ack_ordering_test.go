@@ -1,4 +1,4 @@
-package ordering_test
+package ackordering_test
 
 import (
 	"context"
@@ -9,9 +9,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/uw-labs/substrate"
+	"github.com/uw-labs/substrate-tools/ackordering"
 	"github.com/uw-labs/substrate-tools/message"
 	"github.com/uw-labs/substrate-tools/mock"
-	"github.com/uw-labs/substrate-tools/ordering"
 )
 
 func TestAckOrderingMessageSource(t *testing.T) {
@@ -31,7 +31,7 @@ func TestAckOrderingMessageSource(t *testing.T) {
 		},
 	}
 
-	source := ordering.NewAckOrderingMessageSource(mockSource)
+	source := ackordering.NewAsyncMessageSource(mockSource)
 	messages, acks := make(chan substrate.Message), make(chan substrate.Message)
 	go func() {
 		require.NoError(t, source.ConsumeMessages(context.Background(), messages, acks))

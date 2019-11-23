@@ -9,16 +9,9 @@ import (
 
 var labels = []string{"status", "topic"}
 
-// AsyncMessageSink is an instrumented message sink
-// The counter vector will have the labels "status" and "topic"
-type AsyncMessageSink struct {
-	impl    substrate.AsyncMessageSink
-	counter *prometheus.CounterVec
-	topic   string
-}
-
-// NewAsyncMessageSink returns a pointer to a new AsyncMessageSink
-func NewAsyncMessageSink(sink substrate.AsyncMessageSink, counterOpts prometheus.CounterOpts, topic string) *AsyncMessageSink {
+// NewAsyncMessageSink returns an instance of substrate.AsyncMessageSink that  exposes prometheus metrics
+// for the message sink labelled with topic and status. It panics in case it can't register the metric.
+func NewAsyncMessageSink(sink substrate.AsyncMessageSink, counterOpts prometheus.CounterOpts, topic string) substrate.AsyncMessageSink {
 	counter := prometheus.NewCounterVec(counterOpts, labels)
 
 	if err := prometheus.Register(counter); err != nil {
@@ -29,15 +22,23 @@ func NewAsyncMessageSink(sink substrate.AsyncMessageSink, counterOpts prometheus
 		}
 	}
 
-	return &AsyncMessageSink{
+	return &instrumentedSink{
 		impl:    sink,
 		counter: counter,
 		topic:   topic,
 	}
 }
 
-// PublishMessages implements message publshing wrapped in instrumentation
-func (ams *AsyncMessageSink) PublishMessages(ctx context.Context, acks chan<- substrate.Message, messages <-chan substrate.Message) (rerr error) {
+// instrumentedSink is an instrumented message sink
+// The counter vector will have the labels "status" and "topic"
+type instrumentedSink struct {
+	impl    substrate.AsyncMessageSink
+	counter *prometheus.CounterVec
+	topic   string
+}
+
+// PublishMessages implements message publishing wrapped in instrumentation.
+func (ams *instrumentedSink) PublishMessages(ctx context.Context, acks chan<- substrate.Message, messages <-chan substrate.Message) (rerr error) {
 	successes := make(chan substrate.Message, cap(acks))
 
 	errs := make(chan error)
@@ -71,12 +72,12 @@ func (ams *AsyncMessageSink) PublishMessages(ctx context.Context, acks chan<- su
 	}
 }
 
-// Close closes the message sink
-func (ams *AsyncMessageSink) Close() error {
+// Close closes the message sink.
+func (ams *instrumentedSink) Close() error {
 	return ams.impl.Close()
 }
 
 // Status returns the status of this sink, or an error if the status could not be determined.
-func (ams *AsyncMessageSink) Status() (*substrate.Status, error) {
+func (ams *instrumentedSink) Status() (*substrate.Status, error) {
 	return ams.impl.Status()
 }

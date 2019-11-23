@@ -14,7 +14,7 @@ import (
 )
 
 func TestNewMessageSource_Error(t *testing.T) {
-	_, err := multi.NewMessageSource(nil)
+	_, err := multi.NewAsyncMessageSource(nil)
 	require.Equal(t, multi.ErrNoMessageSources, err)
 }
 
@@ -45,7 +45,7 @@ func TestMultiMessageSource_ConsumeMessages(t *testing.T) {
 			},
 		},
 	}
-	source, err := multi.NewMessageSource(sources)
+	source, err := multi.NewAsyncMessageSource(sources)
 	require.NoError(t, err)
 	defer func() {
 		require.NoError(t, source.Close())
@@ -79,7 +79,7 @@ func TestMultiMessageSource_Close(t *testing.T) {
 		&mock.AsyncMessageSource{},
 		&mock.AsyncMessageSource{},
 	}
-	source, err := multi.NewMessageSource(sources)
+	source, err := multi.NewAsyncMessageSource(sources)
 	require.NoError(t, err)
 
 	require.NoError(t, source.Close())
@@ -95,7 +95,7 @@ func TestMultiMessageSource_Status(t *testing.T) {
 		&mock.AsyncMessageSource{},
 		&mock.AsyncMessageSource{},
 	}
-	source, err := multi.NewMessageSource(sources)
+	source, err := multi.NewAsyncMessageSource(sources)
 	require.NoError(t, err)
 	defer func() {
 		require.NoError(t, source.Close())

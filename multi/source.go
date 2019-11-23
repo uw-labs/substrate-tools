@@ -13,10 +13,10 @@ import (
 // ErrNoMessageSources is na error indicating that no message sources were provided to the multi source.
 var ErrNoMessageSources = errors.New("no message sources provided")
 
-// NewMessageSource returns an instance of substrate.AsyncMessageSource that consumes messages
+// NewAsyncMessageSource returns an instance of substrate.AsyncMessageSource that consumes messages
 // from all of the provided message sources and passes them on to the client and passes acknowledgements
 // to the relevant source. It returns an error if no message sources are provided.
-func NewMessageSource(sources []substrate.AsyncMessageSource) (substrate.AsyncMessageSource, error) {
+func NewAsyncMessageSource(sources []substrate.AsyncMessageSource) (substrate.AsyncMessageSource, error) {
 	if len(sources) == 0 {
 		return nil, ErrNoMessageSources
 	}

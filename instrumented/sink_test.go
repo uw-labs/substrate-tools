@@ -30,7 +30,7 @@ func (m Message) Data() []byte {
 }
 
 func TestPublishMessagesSuccessfully(t *testing.T) {
-	sink := AsyncMessageSink{
+	sink := instrumentedSink{
 		impl: &asyncMessageSinkMock{
 			publishMessageMock: func(ctx context.Context, acks chan<- substrate.Message, messages <-chan substrate.Message) error {
 				for {
@@ -81,7 +81,7 @@ func TestPublishMessagesSuccessfully(t *testing.T) {
 
 func TestPublishMessagesWithError(t *testing.T) {
 	producingError := errors.New("message producing error")
-	sink := AsyncMessageSink{
+	sink := instrumentedSink{
 		impl: &asyncMessageSinkMock{
 			publishMessageMock: func(ctx context.Context, acks chan<- substrate.Message, messages <-chan substrate.Message) error {
 				for {
@@ -138,7 +138,7 @@ func TestProduceOnBackendShutdown(t *testing.T) {
 	expectedErr := errors.New("shutdown")
 	backendCtx, backendCancel := context.WithCancel(context.Background())
 
-	source := AsyncMessageSink{
+	source := instrumentedSink{
 		impl: &asyncMessageSinkMock{
 			publishMessageMock: func(ctx context.Context, acks chan<- substrate.Message, messages <-chan substrate.Message) error {
 				select {

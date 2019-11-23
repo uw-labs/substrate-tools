@@ -7,16 +7,9 @@ import (
 	"github.com/uw-labs/substrate"
 )
 
-// AsyncMessageSource is an instrumented message source
-// The counter vector will have the labels "status" and "topic"
-type AsyncMessageSource struct {
-	impl    substrate.AsyncMessageSource
-	counter *prometheus.CounterVec
-	topic   string
-}
-
-// NewAsyncMessageSource returns a pointer to a new AsyncMessageSource
-func NewAsyncMessageSource(source substrate.AsyncMessageSource, counterOpts prometheus.CounterOpts, topic string) *AsyncMessageSource {
+// NewAsyncMessageSink returns an instance of substrate.AsyncMessageSource that exposes prometheus metrics
+// for the message source labelled with topic and status. It panics in case it can't register the metric.
+func NewAsyncMessageSource(source substrate.AsyncMessageSource, counterOpts prometheus.CounterOpts, topic string) substrate.AsyncMessageSource {
 	counter := prometheus.NewCounterVec(counterOpts, labels)
 
 	if err := prometheus.Register(counter); err != nil {
@@ -27,15 +20,23 @@ func NewAsyncMessageSource(source substrate.AsyncMessageSource, counterOpts prom
 		}
 	}
 
-	return &AsyncMessageSource{
+	return &instrumentedSource{
 		impl:    source,
 		counter: counter,
 		topic:   topic,
 	}
 }
 
+// instrumentedSource is an instrumented message source
+// The counter vector will have the labels "status" and "topic"
+type instrumentedSource struct {
+	impl    substrate.AsyncMessageSource
+	counter *prometheus.CounterVec
+	topic   string
+}
+
 // ConsumeMessages implements message consuming wrapped in instrumentation
-func (ams *AsyncMessageSource) ConsumeMessages(ctx context.Context, messages chan<- substrate.Message, acks <-chan substrate.Message) error {
+func (ams *instrumentedSource) ConsumeMessages(ctx context.Context, messages chan<- substrate.Message, acks <-chan substrate.Message) error {
 	toBeAcked := make(chan substrate.Message, cap(acks))
 
 	errs := make(chan error)
@@ -70,11 +71,11 @@ func (ams *AsyncMessageSource) ConsumeMessages(ctx context.Context, messages cha
 }
 
 // Close closes the message source
-func (ams *AsyncMessageSource) Close() error {
+func (ams *instrumentedSource) Close() error {
 	return ams.impl.Close()
 }
 
 // Status returns the status of this source, or an error if the status could not be determined.
-func (ams *AsyncMessageSource) Status() (*substrate.Status, error) {
+func (ams *instrumentedSource) Status() (*substrate.Status, error) {
 	return ams.impl.Status()
 }

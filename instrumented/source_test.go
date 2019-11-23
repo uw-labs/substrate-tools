@@ -24,7 +24,7 @@ func (m asyncMessageSourceMock) ConsumeMessages(ctx context.Context, in chan<- s
 func TestConsumeMessagesSuccessfully(t *testing.T) {
 	receivedAcks := make(chan substrate.Message)
 
-	source := AsyncMessageSource{
+	source := instrumentedSource{
 		impl: &asyncMessageSourceMock{
 			consumerMessagesMock: func(ctx context.Context, messages chan<- substrate.Message, acks <-chan substrate.Message) error {
 				messages <- Message{}
@@ -79,7 +79,7 @@ func TestConsumeMessagesSuccessfully(t *testing.T) {
 func TestConsumeMessagesWithError(t *testing.T) {
 	consumingErr := errors.New("consuming error")
 
-	source := AsyncMessageSource{
+	source := instrumentedSource{
 		impl: &asyncMessageSourceMock{
 			consumerMessagesMock: func(ctx context.Context, messages chan<- substrate.Message, acks <-chan substrate.Message) error {
 				return consumingErr
@@ -120,7 +120,7 @@ func TestConsumeOnBackendShutdown(t *testing.T) {
 	expectedErr := errors.New("shutdown")
 	backendCtx, backendCancel := context.WithCancel(context.Background())
 
-	source := AsyncMessageSource{
+	source := instrumentedSource{
 		impl: &asyncMessageSourceMock{
 			consumerMessagesMock: func(ctx context.Context, messages chan<- substrate.Message, acks <-chan substrate.Message) error {
 				select {
