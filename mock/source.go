@@ -24,7 +24,8 @@ type AsyncMessageSource struct {
 }
 
 // ConsumeMessages consumes messages sends all messages in the underlying slice to the client, waits for all of them
-// to be acknowledged in the correct order and exits. It will error in case the source was already closed.
+// to be acknowledged in the correct order and then waits for the provided context to be cancelled. It will error
+// in case the source was already closed.
 func (s *AsyncMessageSource) ConsumeMessages(ctx context.Context, messages chan<- substrate.Message, acks <-chan substrate.Message) error {
 	ctx, err := s.init(ctx)
 	if err != nil {
@@ -76,6 +77,7 @@ func (s *AsyncMessageSource) ConsumeMessages(ctx context.Context, messages chan<
 		}
 	}
 
+	<-ctx.Done()
 	return nil
 }
 

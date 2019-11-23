@@ -1,7 +1,8 @@
-package backend
+package multi
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
@@ -9,10 +10,19 @@ import (
 	"github.com/uw-labs/sync/rungroup"
 )
 
-func NewMessageSource(sources []substrate.AsyncMessageSource) substrate.AsyncMessageSource {
+// ErrNoMessageSources is na error indicating that no message sources were provided to the multi source.
+var ErrNoMessageSources = errors.New("no message sources provided")
+
+// NewMessageSource returns an instance of substrate.AsyncMessageSource that consumes messages
+// from all of the provided message sources and passes them on to the client and passes acknowledgements
+// to the relevant source. It returns an error if no message sources are provided.
+func NewMessageSource(sources []substrate.AsyncMessageSource) (substrate.AsyncMessageSource, error) {
+	if len(sources) == 0 {
+		return nil, ErrNoMessageSources
+	}
 	return multiSource{
 		sources: sources,
-	}
+	}, nil
 }
 
 // multiSource implements substrate.AsyncMessageSource that consumes messages from multiple sources.
@@ -95,14 +105,16 @@ func (s multiSource) Close() (err error) {
 func (s multiSource) Status() (status *substrate.Status, err error) {
 	status = &substrate.Status{Working: true}
 
-	for _, source := range s.sources {
+	for i, source := range s.sources {
 		sourceStatus, sourceErr := source.Status()
 		if sourceErr != nil {
 			status.Working = false
 			err = multierror.Append(err, sourceErr)
 		} else {
 			status.Working = status.Working && sourceStatus.Working
-			status.Problems = append(status.Problems, sourceStatus.Problems...)
+			for _, problem := range sourceStatus.Problems {
+				status.Problems = append(status.Problems, fmt.Sprintf("source %v: %s", i, problem))
+			}
 		}
 	}
 
