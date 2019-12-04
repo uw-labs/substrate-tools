@@ -21,6 +21,8 @@ func NewAsyncMessageSink(sink substrate.AsyncMessageSink, counterOpts prometheus
 			panic(err)
 		}
 	}
+	counter.WithLabelValues("error", topic).Add(0)
+	counter.WithLabelValues("success", topic).Add(0)
 
 	return &instrumentedSink{
 		impl:    sink,
