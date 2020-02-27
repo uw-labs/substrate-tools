@@ -43,8 +43,9 @@ func TestConsumeMessagesSuccessfully(t *testing.T) {
 			prometheus.CounterOpts{
 				Help: "source_counter",
 				Name: "source_counter",
-			}, []string{"status", "topic"}),
-		topic: "testTopic",
+			}, sourceLabels),
+		topic:    "testTopic",
+		consumer: "testConsumer",
 	}
 
 	acks := make(chan substrate.Message)
@@ -68,7 +69,7 @@ func TestConsumeMessagesSuccessfully(t *testing.T) {
 			return
 		case <-receivedAcks:
 			var metric dto.Metric
-			assert.NoError(t, source.counter.WithLabelValues("success", "testTopic").Write(&metric))
+			assert.NoError(t, source.counter.WithLabelValues("success", "testTopic", "testConsumer").Write(&metric))
 			assert.Equal(t, 1, int(*metric.Counter.Value))
 
 			sourceCancel()
@@ -89,8 +90,9 @@ func TestConsumeMessagesWithError(t *testing.T) {
 			prometheus.CounterOpts{
 				Help: "source_counter",
 				Name: "source_counter",
-			}, []string{"status", "topic"}),
-		topic: "testTopic",
+			}, sourceLabels),
+		topic:    "testTopic",
+		consumer: "testConsumer",
 	}
 
 	acks := make(chan substrate.Message)
@@ -110,7 +112,7 @@ func TestConsumeMessagesWithError(t *testing.T) {
 	assert.Equal(t, consumingErr, err)
 
 	var metric dto.Metric
-	assert.NoError(t, source.counter.WithLabelValues("error", "testTopic").Write(&metric))
+	assert.NoError(t, source.counter.WithLabelValues("error", "testTopic", "testConsumer").Write(&metric))
 	assert.Equal(t, 1, int(*metric.Counter.Value))
 
 	sourceCancel()
@@ -135,8 +137,9 @@ func TestConsumeOnBackendShutdown(t *testing.T) {
 			prometheus.CounterOpts{
 				Help: "source_counter",
 				Name: "source_counter",
-			}, []string{"status", "topic"}),
-		topic: "testTopic",
+			}, sourceLabels),
+		topic:    "testTopic",
+		consumer: "testConsumer",
 	}
 
 	acks := make(chan substrate.Message)
@@ -169,7 +172,7 @@ func TestConsumeOnBackendShutdown(t *testing.T) {
 		assert.Equal(t, expectedErr, err)
 		// Check metric was increased
 		var metric dto.Metric
-		assert.NoError(t, source.counter.WithLabelValues("error", "testTopic").Write(&metric))
+		assert.NoError(t, source.counter.WithLabelValues("error", "testTopic", "testConsumer").Write(&metric))
 		assert.Equal(t, 1, int(*metric.Counter.Value))
 	}
 }

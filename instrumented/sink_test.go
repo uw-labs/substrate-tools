@@ -47,7 +47,7 @@ func TestPublishMessagesSuccessfully(t *testing.T) {
 			prometheus.CounterOpts{
 				Help: "sink_counter",
 				Name: "sink_counter",
-			}, []string{"status", "topic"}),
+			}, sinkLabels),
 		topic: "testTopic",
 	}
 
@@ -98,7 +98,7 @@ func TestPublishMessagesWithError(t *testing.T) {
 			prometheus.CounterOpts{
 				Help: "sink_counter",
 				Name: "sink_counter",
-			}, []string{"status", "topic"}),
+			}, sinkLabels),
 		topic: "testTopic",
 	}
 
@@ -158,7 +158,7 @@ func TestProduceOnBackendShutdown(t *testing.T) {
 			prometheus.CounterOpts{
 				Help: "sink_counter",
 				Name: "sink_counter",
-			}, []string{"status", "topic"}),
+			}, sinkLabels),
 		topic: "testTopic",
 	}
 
