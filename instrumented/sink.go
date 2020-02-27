@@ -7,12 +7,12 @@ import (
 	"github.com/uw-labs/substrate"
 )
 
-var labels = []string{"status", "topic"}
+var sinkLabels = []string{"status", "topic"}
 
 // NewAsyncMessageSink returns an instance of substrate.AsyncMessageSink that  exposes prometheus metrics
 // for the message sink labelled with topic and status. It panics in case it can't register the metric.
 func NewAsyncMessageSink(sink substrate.AsyncMessageSink, counterOpts prometheus.CounterOpts, topic string) substrate.AsyncMessageSink {
-	counter := prometheus.NewCounterVec(counterOpts, labels)
+	counter := prometheus.NewCounterVec(counterOpts, sinkLabels)
 
 	if err := prometheus.Register(counter); err != nil {
 		if are, ok := err.(prometheus.AlreadyRegisteredError); ok {

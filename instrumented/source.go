@@ -7,10 +7,12 @@ import (
 	"github.com/uw-labs/substrate"
 )
 
+var sourceLabels = []string{"status", "topic", "consumer"}
+
 // NewAsyncMessageSink returns an instance of substrate.AsyncMessageSource that exposes prometheus metrics
 // for the message source labelled with topic and status. It panics in case it can't register the metric.
-func NewAsyncMessageSource(source substrate.AsyncMessageSource, counterOpts prometheus.CounterOpts, topic string) substrate.AsyncMessageSource {
-	counter := prometheus.NewCounterVec(counterOpts, labels)
+func NewAsyncMessageSource(source substrate.AsyncMessageSource, counterOpts prometheus.CounterOpts, topic, consumer string) substrate.AsyncMessageSource {
+	counter := prometheus.NewCounterVec(counterOpts, sourceLabels)
 
 	if err := prometheus.Register(counter); err != nil {
 		if are, ok := err.(prometheus.AlreadyRegisteredError); ok {
@@ -19,22 +21,24 @@ func NewAsyncMessageSource(source substrate.AsyncMessageSource, counterOpts prom
 			panic(err)
 		}
 	}
-	counter.WithLabelValues("error", topic).Add(0)
-	counter.WithLabelValues("success", topic).Add(0)
+	counter.WithLabelValues("error", topic, consumer).Add(0)
+	counter.WithLabelValues("success", topic, consumer).Add(0)
 
 	return &instrumentedSource{
-		impl:    source,
-		counter: counter,
-		topic:   topic,
+		impl:     source,
+		counter:  counter,
+		topic:    topic,
+		consumer: consumer,
 	}
 }
 
 // instrumentedSource is an instrumented message source
-// The counter vector will have the labels "status" and "topic"
+// The counter vector will have the labels "status", "topic" and "consumer"
 type instrumentedSource struct {
-	impl    substrate.AsyncMessageSource
-	counter *prometheus.CounterVec
-	topic   string
+	impl     substrate.AsyncMessageSource
+	counter  *prometheus.CounterVec
+	topic    string
+	consumer string
 }
 
 // ConsumeMessages implements message consuming wrapped in instrumentation
@@ -56,16 +60,16 @@ func (ams *instrumentedSource) ConsumeMessages(ctx context.Context, messages cha
 				return <-errs
 			case err := <-errs:
 				if err != nil {
-					ams.counter.WithLabelValues("error", ams.topic).Inc()
+					ams.counter.WithLabelValues("error", ams.topic, ams.consumer).Inc()
 				}
 				return err
 			}
-			ams.counter.WithLabelValues("success", ams.topic).Inc()
+			ams.counter.WithLabelValues("success", ams.topic, ams.consumer).Inc()
 		case <-ctx.Done():
 			return <-errs
 		case err := <-errs:
 			if err != nil {
-				ams.counter.WithLabelValues("error", ams.topic).Inc()
+				ams.counter.WithLabelValues("error", ams.topic, ams.consumer).Inc()
 			}
 			return err
 		}
