@@ -7,6 +7,11 @@ Collection of middleware, wrappers and other tools for substrate.
 Is a message source wrapper that allows the user to acknowledge messages in any order and it will ensure
 messages are sent to the actual message source in the same order they are consumed.
 
+### Async
+Is an async message source wrapper that allows the user to utilise a handler pattern for interacting
+with an async message source. It removes the need to manually handle the message and acknowledgement
+channels.
+
 ### Instrumented
 Provides wrappers for both message source and message sink that add prometheus metrics labeled with topic and status (either success or error).
 
