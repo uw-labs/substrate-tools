@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
 
@@ -10,8 +9,6 @@ import (
 	"github.com/uw-labs/substrate-tools/flush"
 	"github.com/uw-labs/substrate/kafka"
 )
-
-const messages = 200
 
 func main() {
 	asyncSink, err := kafka.NewAsyncMessageSink(kafka.AsyncMessageSinkConfig{
@@ -29,7 +26,7 @@ func main() {
 	defer cancel()
 
 	sink := flush.NewAsyncMessageSink(asyncSink, flush.WithAckFunc(func(msg substrate.Message) error {
-		fmt.Println(string(msg.Data()))
+		println(string(msg.Data()))
 		return nil
 	}))
 	defer func() {
@@ -46,15 +43,28 @@ func main() {
 		}
 	}()
 
-	var wg sync.WaitGroup
-	wg.Add(messages)
+	messages := []string{
+		"message one",
+		"message two",
+		"message three",
+		"message four",
+		"message five",
+		"message six",
+		"message seven",
+		"message eight",
+		"message nine",
+		"message ten",
+	}
 
-	for i := 0; i < messages; i++ {
-		go func(i int) {
+	var wg sync.WaitGroup
+	wg.Add(len(messages))
+
+	for _, msg := range messages {
+		go func(msg string) {
 			defer wg.Done()
 
-			sink.PublishMessage([]byte(string('A' + i)))
-		}(i)
+			sink.PublishMessage([]byte(msg))
+		}(msg)
 	}
 
 	wg.Wait()

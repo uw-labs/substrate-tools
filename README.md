@@ -22,6 +22,66 @@ It ensures that the acknowledgements are passed to the correct source.
 ### Flush
 Is a message flushing wrapper which blocks until all produced messages have been acked by the user. In the scenario that the user performs an action only after a message has been produced, the flushing wrapper provides a guarantee that such an action is only performed on a successful sink.
 
+#### Example usage
+
+```go
+    asyncSink, err := kafka.NewAsyncMessageSink(kafka.AsyncMessageSinkConfig{
+		Brokers: []string{"localhost:9092"},
+		Topic:   "example-stratesub-topic",
+		Version: "2.0.1",
+	})
+	if err != nil {
+		panic(err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	sink := flush.NewAsyncMessageSink(asyncSink, flush.WithAckFunc(func(msg substrate.Message) error {
+		println(string(msg.Data()))
+		return nil
+	}))
+	defer func() {
+		err := sink.Flush(ctx)
+		if err != nil {
+			panic(err)
+		}
+	}()
+
+	go func() {
+		err = sink.Run(ctx)
+		if err != nil {
+			panic(err)
+		}
+	}()
+
+	messages := []string{
+		"message one",
+		"message two",
+		"message three",
+		"message four",
+		"message five",
+		"message six",
+		"message seven",
+		"message eight",
+		"message nine",
+		"message ten",
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(len(messages))
+
+	for _, msg := range messages {
+		go func(msg string) {
+			defer wg.Done()
+
+			sink.PublishMessage([]byte(msg))
+		}(msg)
+	}
+
+	wg.Wait()
+```
+
 ## Other
 
 ### Message
