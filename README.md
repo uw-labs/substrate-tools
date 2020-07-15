@@ -20,7 +20,7 @@ Is a message source wrapper that wraps any number of sources. It consumes messag
 It ensures that the acknowledgements are passed to the correct source.
 
 ### Flush
-Is a message flushing wrapper which blocks until all produced messages have been acked by the user. In the scenario that the user performs an action only when the sink has acknowledge the write, the flushing wrapper provides a guarantee that such an action is only performed on a successful sink.
+Is a message flushing wrapper which blocks until all produced messages have been acked by the user. In the scenario that the user performs an action only after a message has been produced, the flushing wrapper provides a guarantee that such an action is only performed on a successful sink.
 
 ## Other
 
