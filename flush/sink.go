@@ -145,7 +145,6 @@ func (ams *AsyncMessageSink) Close() error {
 		ams.wait()
 	}
 
-	close(ams.msgCh)
 	return ams.sink.Close()
 }
 
