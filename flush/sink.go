@@ -120,9 +120,15 @@ func (ams *AsyncMessageSink) Run() error {
 // called concurrently by the user. The ctx passed to PublishMessage controls only the publishing
 // of the message and is a seperate concern to the constructor context.
 func (ams *AsyncMessageSink) PublishMessage(ctx context.Context, msg []byte) error {
+	if ams.ctx.Err() != nil {
+		return substrate.ErrSinkAlreadyClosed
+	}
+
 	select {
+	case <-ams.ctx.Done():
+		return substrate.ErrSinkAlreadyClosed
 	case <-ctx.Done():
-		return ctx.Err()
+		return substrate.ErrSinkAlreadyClosed
 	case ams.msgCh <- message.NewMessage(msg):
 		atomic.AddUint64(&ams.msgs, 1)
 	}

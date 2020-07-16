@@ -2,6 +2,7 @@ package flush_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -199,7 +200,7 @@ func TestAsyncMessageSinkPublishError(t *testing.T) {
 	}
 }
 
-func TestAsyncMessageSinkEarlyCloseProducesPanic(t *testing.T) {
+func TestAsyncMessageSinkEarlyCloseErrors(t *testing.T) {
 	ctx := context.TODO()
 
 	mock := asyncMessageSinkMock{
@@ -218,14 +219,11 @@ func TestAsyncMessageSinkEarlyCloseProducesPanic(t *testing.T) {
 	sink := flush.NewAsyncMessageSink(ctx, mock)
 	sink.Close()
 
-	defer func() {
-		if r := recover(); r == nil {
-			t.Fatal("expected a panic")
-		}
-	}()
-
 	go sink.Run()
-	sink.PublishMessage(ctx, []byte("dummy-message")) // send to a closed channel
+	err := sink.PublishMessage(ctx, []byte("dummy-message")) // send to a closed channel
+	if err == nil || (err != nil && !errors.Is(err, substrate.ErrSinkAlreadyClosed)) {
+		t.Fatal("expected a substrate.ErrSinkAlreadyClosed error")
+	}
 }
 
 func BenchmarkAsyncMessageSink_1_50(b *testing.B) {
