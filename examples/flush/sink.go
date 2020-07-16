@@ -13,7 +13,7 @@ import (
 func main() {
 	asyncSink, err := kafka.NewAsyncMessageSink(kafka.AsyncMessageSinkConfig{
 		Brokers: []string{"localhost:9092"},
-		Topic:   "example-stratesub-topic",
+		Topic:   "example-topic",
 		Version: "2.0.1",
 	})
 	if err != nil {

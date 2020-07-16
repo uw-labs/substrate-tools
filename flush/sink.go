@@ -128,7 +128,7 @@ func (ams *AsyncMessageSink) PublishMessage(ctx context.Context, msg []byte) err
 	case <-ams.ctx.Done():
 		return substrate.ErrSinkAlreadyClosed
 	case <-ctx.Done():
-		return substrate.ErrSinkAlreadyClosed
+		return ctx.Err()
 	case ams.msgCh <- message.NewMessage(msg):
 		atomic.AddUint64(&ams.msgs, 1)
 	}
