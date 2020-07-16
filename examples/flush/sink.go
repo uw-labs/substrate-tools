@@ -20,24 +20,30 @@ func main() {
 		panic(err)
 	}
 
-	// `cancel` is used to terminate `sink.Run`. Timeout is used to prevent
-	// `sink.Flush` being able to infinitely block.
+	// This context is used to control the goroutines initialised by the flushing wrapper.
+	// Canelling this context closes the underlying sink and allows `Flush` to return.
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	sink := flush.NewAsyncMessageSink(asyncSink, flush.WithAckFunc(func(msg substrate.Message) error {
+	ackFn := flush.WithAckFunc(func(msg substrate.Message) error {
 		println(string(msg.Data()))
 		return nil
-	}))
+	})
+
+	sink := flush.NewAsyncMessageSink(ctx, asyncSink, ackFn)
 	defer func() {
-		err := sink.Flush(ctx)
+		// Flush will block until all messages produced using `PublishMessage` have been acked
+		// by the AckFunc, if provided.
+		err := sink.Flush()
 		if err != nil {
 			panic(err)
 		}
 	}()
 
 	go func() {
-		err = sink.Run(ctx)
+		// Run blocks until the sink is closed or an error occurs. If the AckFn retruns an error
+		// it will be returned by `Run`.
+		err = sink.Run()
 		if err != nil {
 			panic(err)
 		}
@@ -63,7 +69,10 @@ func main() {
 		go func(msg string) {
 			defer wg.Done()
 
-			sink.PublishMessage([]byte(msg))
+			// This context is used to control the publishing of the message. This ctx
+			// could, and probably should, be different to the lifecyle context passed
+			// into the constructor.
+			sink.PublishMessage(context.Background(), []byte(msg))
 		}(msg)
 	}
 

@@ -25,7 +25,7 @@ Is a message flushing wrapper which blocks until all produced messages have been
 #### Example usage
 
 ```go
-    asyncSink, err := kafka.NewAsyncMessageSink(kafka.AsyncMessageSinkConfig{
+	asyncSink, err := kafka.NewAsyncMessageSink(kafka.AsyncMessageSinkConfig{
 		Brokers: []string{"localhost:9092"},
 		Topic:   "example-stratesub-topic",
 		Version: "2.0.1",
@@ -37,19 +37,21 @@ Is a message flushing wrapper which blocks until all produced messages have been
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	sink := flush.NewAsyncMessageSink(asyncSink, flush.WithAckFunc(func(msg substrate.Message) error {
+	ackFn := flush.WithAckFunc(func(msg substrate.Message) error {
 		println(string(msg.Data()))
 		return nil
-	}))
+	})
+
+	sink := flush.NewAsyncMessageSink(ctx, asyncSink, ackFn)
 	defer func() {
-		err := sink.Flush(ctx)
+		err := sink.Flush()
 		if err != nil {
 			panic(err)
 		}
 	}()
 
 	go func() {
-		err = sink.Run(ctx)
+		err = sink.Run()
 		if err != nil {
 			panic(err)
 		}
@@ -74,8 +76,7 @@ Is a message flushing wrapper which blocks until all produced messages have been
 	for _, msg := range messages {
 		go func(msg string) {
 			defer wg.Done()
-
-			sink.PublishMessage([]byte(msg))
+			sink.PublishMessage(context.Background(), []byte(msg))
 		}(msg)
 	}
 

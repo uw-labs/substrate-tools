@@ -47,8 +47,11 @@ func WithAckBufferSize(size int) AsyncMessageSinkOption {
 type AckFunc func(msg substrate.Message) error
 
 // AsyncMessageSink wraps substrate.AsyncMessageSink and provides an interface for interaction with
-// the underlying sink, as well as the capability to flush messages.
+// the underlying sink, as well as the capability to flush the message buffer.
 type AsyncMessageSink struct {
+	ctx           context.Context
+	cancel        context.CancelFunc
+	wait          func() error
 	sink          substrate.AsyncMessageSink
 	msgs          uint64
 	msgBufferSize int
@@ -61,8 +64,12 @@ type AsyncMessageSink struct {
 
 // NewAsyncMessageSink returns a pointer a new AsyncMessageSink.
 // See examples/flush/sink.go for example usage.
-func NewAsyncMessageSink(sink substrate.AsyncMessageSink, opts ...AsyncMessageSinkOption) *AsyncMessageSink {
+func NewAsyncMessageSink(ctx context.Context, sink substrate.AsyncMessageSink, opts ...AsyncMessageSinkOption) *AsyncMessageSink {
+	ctx, cancel := context.WithCancel(ctx)
+
 	ams := &AsyncMessageSink{
+		ctx:           ctx,
+		cancel:        cancel,
 		sink:          sink,
 		msgBufferSize: defaultMsgBufferSize,
 		ackBufferSize: defaultAckBufferSize,
@@ -79,11 +86,12 @@ func NewAsyncMessageSink(sink substrate.AsyncMessageSink, opts ...AsyncMessageSi
 }
 
 // Run initialises message publishing using the underlying sink and blocks until either an error
-// occurs or the context is done. If an AckFunc is configured, Run will execute it for each ack
-// recieved. If an error is returned, the user should cancel the context to prevent `Flush` from
-// blocking.
-func (ams *AsyncMessageSink) Run(ctx context.Context) error {
-	group, groupctx := rungroup.New(ctx)
+// occurs or the constructor context is done. If an AckFunc is configured, Run will execute it for
+// each ack recieved. If an error is returned, the user should cancel the constructor context to
+// prevent `Flush` from blocking.
+func (ams *AsyncMessageSink) Run() error {
+	group, groupctx := rungroup.New(ams.ctx)
+	ams.wait = group.Wait
 
 	group.Go(func() error {
 		return ams.sink.PublishMessages(groupctx, ams.ackCh, ams.msgCh)
@@ -94,7 +102,11 @@ func (ams *AsyncMessageSink) Run(ctx context.Context) error {
 			select {
 			case <-groupctx.Done():
 				return nil
-			case msg := <-ams.ackCh:
+			case msg, ok := <-ams.ackCh:
+				if !ok {
+					return nil
+				}
+
 				if ams.ackFn != nil {
 					err := ams.ackFn(msg)
 					if err != nil {
@@ -107,18 +119,33 @@ func (ams *AsyncMessageSink) Run(ctx context.Context) error {
 		}
 	})
 
-	return group.Wait()
+	return ams.wait()
 }
 
 // PublishMessage publishes a message to the underlying sink. PublishMessage is desgined to be
-// called concurrently by the user.
-func (ams *AsyncMessageSink) PublishMessage(msg []byte) {
-	atomic.AddUint64(&ams.msgs, 1)
-	ams.msgCh <- message.NewMessage(msg)
+// called concurrently by the user. The ctx passed to PublishMessage controls only the publishing
+// of the message and is a seperate concern to the constructor context.
+func (ams *AsyncMessageSink) PublishMessage(ctx context.Context, msg []byte) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case ams.msgCh <- message.NewMessage(msg):
+		atomic.AddUint64(&ams.msgs, 1)
+	}
+
+	return nil
 }
 
-// Close closes the underlying sink and releases it's resources.
+// Close permanently closes the underlying sink and releases its resources. If Run has been called
+// before Close, Close will block until any active AckFuncs return.
 func (ams *AsyncMessageSink) Close() error {
+	ams.cancel()
+
+	if ams.wait != nil {
+		ams.wait()
+	}
+
+	close(ams.msgCh)
 	return ams.sink.Close()
 }
 
@@ -127,15 +154,13 @@ func (ams *AsyncMessageSink) Status() (*substrate.Status, error) {
 	return ams.sink.Status()
 }
 
-// Flush blocks until the AsyncMessageSink has consumed as many acks as messages produced or ctx
-// is done. Flush returns an error if the context is cancelled before all messages produced have
-// been acked.
-func (ams *AsyncMessageSink) Flush(ctx context.Context) error {
-	defer ams.Close()
-
+// Flush blocks until the AsyncMessageSink has consumed as many acks as messages produced or the
+// constructor ctx is done. Flush returns an error if the context is cancelled before all messages
+// produced have been acked.
+func (ams *AsyncMessageSink) Flush() error {
 	for {
 		select {
-		case <-ctx.Done():
+		case <-ams.ctx.Done():
 			if atomic.LoadUint64(&ams.msgs) > atomic.LoadUint64(&ams.acks) {
 				return fmt.Errorf("incomplete flush: %d left to ack", atomic.LoadUint64(&ams.msgs)-atomic.LoadUint64(&ams.acks))
 			}
