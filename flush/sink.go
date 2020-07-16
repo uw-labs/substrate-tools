@@ -94,29 +94,23 @@ func (ams *AsyncMessageSink) Run() error {
 	ams.wait = group.Wait
 
 	group.Go(func() error {
+		defer close(ams.ackCh)
 		return ams.sink.PublishMessages(groupctx, ams.ackCh, ams.msgCh)
 	})
 
 	group.Go(func() error {
-		for {
-			select {
-			case <-groupctx.Done():
-				return nil
-			case msg, ok := <-ams.ackCh:
-				if !ok {
-					return nil
+		for msg := range ams.ackCh {
+			if ams.ackFn != nil {
+				err := ams.ackFn(msg)
+				if err != nil {
+					return err
 				}
-
-				if ams.ackFn != nil {
-					err := ams.ackFn(msg)
-					if err != nil {
-						return err
-					}
-				}
-
-				atomic.AddUint64(&ams.acks, 1)
 			}
+
+			atomic.AddUint64(&ams.acks, 1)
 		}
+
+		return nil
 	})
 
 	return ams.wait()
