@@ -83,49 +83,6 @@ for _, msg := range messages {
 wg.Wait()
 ```
 
-### Simple
-Is an abstraction designed to provide a simpler interface for working with substrate. In the scenario a user simply 
-wants to consume messages from a source and either doesn't care about acks or is using something such as the 
-`ackordering` pkg, `simple` provides a smaller API designed to do just that.
-
-#### Example usage
-
-```go
-ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-defer cancel()
-
-asyncSource, err := kafka.NewAsyncMessageSource(kafka.AsyncMessageSourceConfig{
-	ConsumerGroup: "simple-consumer",
-	Brokers:       []string{"localhost:9092"},
-	Topic:         "example-topic",
-	Version:       "2.0.1",
-	Offset:        -2,
-})
-if err != nil {
-	panic(err)
-}
-
-msgFn := func(_ context.Context, msg substrate.Message) error {
-	println(string(msg.Data()))
-	return nil
-}
-
-asyncSource = ackordering.NewAsyncMessageSource(asyncSource)
-source := simple.NewAsyncMessageSource(ctx, asyncSource, simple.WithMsgFunc(msgFn))
-
-defer func() {
-	err := source.Close()
-	if err != nil {
-		panic(err)
-	}
-}()
-
-err = source.Run()
-if err != nil {
-	panic(err)
-}
-```
-
 ## Other
 
 ### Message

@@ -3,6 +3,7 @@ package async
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 
@@ -25,7 +26,7 @@ func TestConsumeMessagesSuccessfully(t *testing.T) {
 	receivedAcks := make(chan substrate.Message)
 
 	source := messageSourceAdapter{
-		ac: &messageSourceMock{
+		source: &messageSourceMock{
 			consumerMessagesMock: func(ctx context.Context, messages chan<- substrate.Message, acks <-chan substrate.Message) error {
 				messages <- message.FromString("payload")
 
@@ -39,6 +40,7 @@ func TestConsumeMessagesSuccessfully(t *testing.T) {
 				}
 			},
 		},
+		consumers: 1,
 	}
 
 	sourceContext, sourceCancel := context.WithTimeout(context.Background(), time.Second)
@@ -66,11 +68,67 @@ func TestConsumeMessagesSuccessfully(t *testing.T) {
 	}
 }
 
+func TestConsumeMessagesSuccessfullyConcurrently(t *testing.T) {
+	receivedAcks := make(chan substrate.Message)
+
+	var wg sync.WaitGroup
+
+	source := messageSourceAdapter{
+		source: &messageSourceMock{
+			consumerMessagesMock: func(ctx context.Context, messages chan<- substrate.Message, acks <-chan substrate.Message) error {
+				for i := 0; i < 100; i++ {
+					wg.Add(1)
+					messages <- message.FromString("payload")
+				}
+
+				for {
+					select {
+					case <-ctx.Done():
+						return nil
+					case ack := <-acks:
+						receivedAcks <- ack
+					}
+				}
+			},
+		},
+		consumers: 5,
+		msgBuffer: 100,
+		ackBuffer: 100,
+	}
+
+	sourceContext, sourceCancel := context.WithTimeout(context.Background(), time.Second)
+	defer sourceCancel()
+
+	errs := make(chan error)
+
+	go func() {
+		defer close(errs)
+		errs <- source.ConsumeMessages(sourceContext, func(_ context.Context, _ substrate.Message, ack AckFunc) error {
+			wg.Done()
+			return ack()
+		})
+	}()
+
+	wg.Wait()
+
+	for {
+		select {
+		case err := <-errs:
+			assert.NoError(t, err)
+			return
+		case ack := <-receivedAcks:
+			assert.NotEmpty(t, ack.Data())
+
+			sourceCancel()
+		}
+	}
+}
+
 func TestConsumeMessagesDoubleAckFuncCall(t *testing.T) {
 	receivedAcks := make(chan substrate.Message)
 
 	source := messageSourceAdapter{
-		ac: &messageSourceMock{
+		source: &messageSourceMock{
 			consumerMessagesMock: func(ctx context.Context, messages chan<- substrate.Message, acks <-chan substrate.Message) error {
 				messages <- message.FromString("payload")
 
@@ -84,6 +142,7 @@ func TestConsumeMessagesDoubleAckFuncCall(t *testing.T) {
 				}
 			},
 		},
+		consumers: 1,
 	}
 
 	sourceContext, sourceCancel := context.WithTimeout(context.Background(), time.Second)
@@ -123,7 +182,7 @@ func TestConsumeMessagesAckFuncTimeout(t *testing.T) {
 	receivedAcks := make(chan substrate.Message)
 
 	source := messageSourceAdapter{
-		ac: &messageSourceMock{
+		source: &messageSourceMock{
 			consumerMessagesMock: func(ctx context.Context, messages chan<- substrate.Message, acks <-chan substrate.Message) error {
 				messages <- message.FromString("payload")
 
@@ -135,6 +194,7 @@ func TestConsumeMessagesAckFuncTimeout(t *testing.T) {
 				}
 			},
 		},
+		consumers: 1,
 	}
 
 	sourceContext, sourceCancel := context.WithTimeout(context.Background(), time.Second)
@@ -164,11 +224,12 @@ func TestConsumeMessagesWithError(t *testing.T) {
 	consumingErr := errors.New("consuming error")
 
 	source := messageSourceAdapter{
-		ac: &messageSourceMock{
+		source: &messageSourceMock{
 			consumerMessagesMock: func(_ context.Context, _ chan<- substrate.Message, _ <-chan substrate.Message) error {
 				return consumingErr
 			},
 		},
+		consumers: 1,
 	}
 
 	sourceContext, sourceCancel := context.WithCancel(context.Background())
@@ -194,7 +255,7 @@ func TestConsumeOnBackendShutdown(t *testing.T) {
 	backendCtx, backendCancel := context.WithCancel(context.Background())
 
 	source := messageSourceAdapter{
-		ac: &messageSourceMock{
+		source: &messageSourceMock{
 			consumerMessagesMock: func(ctx context.Context, messages chan<- substrate.Message, acks <-chan substrate.Message) error {
 				select {
 				case <-ctx.Done():
@@ -204,6 +265,7 @@ func TestConsumeOnBackendShutdown(t *testing.T) {
 				}
 			},
 		},
+		consumers: 1,
 	}
 
 	sourceContext, sourceCancel := context.WithTimeout(context.Background(), time.Second*5)
