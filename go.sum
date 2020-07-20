@@ -186,7 +186,6 @@ github.com/stretchr/testify v1.4.0 h1:2E4SXV/wtOkTonXsotYi4li6zVWxYlZuYNCXe9XRJy
 github.com/stretchr/testify v1.4.0/go.mod h1:j7eGeouHqKxXV5pUuKE4zz7dFj8WfuZ+81PSLYec5m4=
 github.com/tv42/httpunix v0.0.0-20150427012821-b75d8614f926/go.mod h1:9ESjWnEqriFuLhtthL60Sar/7RFoluCcXsuvEwTV5KM=
 github.com/urfave/cli v1.20.0/go.mod h1:70zkFmudgCuE/ngEzBv17Jvp/497gISqfk5gWijbERA=
-github.com/utilitywarehouse/stratesub v0.0.0-20200714154232-118cd0c10114 h1:KPJ9tHA3Zp28HS8ylLm9V+etn5rkVU1guNl/Enc7/TI=
 github.com/uw-labs/freezer v0.0.0-20190920143022-fb6f336e053f/go.mod h1:th0wddpLXRokc3BjOsQSMy0B/PY6xGuo0Mwrchu1HtE=
 github.com/uw-labs/proximo v0.0.0-20190913093050-8229af78f5dd/go.mod h1:qvhJ61jBx9RI4vrThNU4jroHCMpbU850pzmm+1b4fYk=
 github.com/uw-labs/straw v0.0.0-20191028082632-df455ab35be2/go.mod h1:bVgIBcoAnl11UG58LiS78c/+ocH5s0QXKloPod/ODiQ=
