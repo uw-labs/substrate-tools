@@ -118,8 +118,6 @@ func TestConsumeMessagesSuccessfullyConcurrently(t *testing.T) {
 			return
 		case ack := <-receivedAcks:
 			assert.NotEmpty(t, ack.Data())
-
-			sourceCancel()
 		}
 	}
 }
