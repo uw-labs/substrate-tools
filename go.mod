@@ -3,6 +3,7 @@ module github.com/uw-labs/substrate-tools
 go 1.13
 
 require (
+	github.com/davecgh/go-spew v1.1.1
 	github.com/hashicorp/go-multierror v1.0.0
 	github.com/pkg/errors v0.8.1
 	github.com/prometheus/client_golang v1.2.1

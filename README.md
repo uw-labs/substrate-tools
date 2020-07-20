@@ -25,62 +25,105 @@ Is a message flushing wrapper which blocks until all produced messages have been
 #### Example usage
 
 ```go
-	asyncSink, err := kafka.NewAsyncMessageSink(kafka.AsyncMessageSinkConfig{
-		Brokers: []string{"localhost:9092"},
-		Topic:   "example-topic",
-		Version: "2.0.1",
-	})
+asyncSink, err := kafka.NewAsyncMessageSink(kafka.AsyncMessageSinkConfig{
+	Brokers: []string{"localhost:9092"},
+	Topic:   "example-topic",
+	Version: "2.0.1",
+})
+if err != nil {
+	panic(err)
+}
+
+ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+defer cancel()
+
+ackFn := flush.WithAckFunc(func(msg substrate.Message) error {
+	println(string(msg.Data()))
+	return nil
+})
+
+sink := flush.NewAsyncMessageSink(ctx, asyncSink, ackFn)
+defer func() {
+	err := sink.Flush()
 	if err != nil {
 		panic(err)
 	}
+}()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	ackFn := flush.WithAckFunc(func(msg substrate.Message) error {
-		println(string(msg.Data()))
-		return nil
-	})
-
-	sink := flush.NewAsyncMessageSink(ctx, asyncSink, ackFn)
-	defer func() {
-		err := sink.Flush()
-		if err != nil {
-			panic(err)
-		}
-	}()
-
-	go func() {
-		err = sink.Run()
-		if err != nil {
-			panic(err)
-		}
-	}()
-
-	messages := []string{
-		"message one",
-		"message two",
-		"message three",
-		"message four",
-		"message five",
-		"message six",
-		"message seven",
-		"message eight",
-		"message nine",
-		"message ten",
+go func() {
+	err = sink.Run()
+	if err != nil {
+		panic(err)
 	}
+}()
 
-	var wg sync.WaitGroup
-	wg.Add(len(messages))
+messages := []string{
+	"message one",
+	"message two",
+	"message three",
+	"message four",
+	"message five",
+	"message six",
+	"message seven",
+	"message eight",
+	"message nine",
+	"message ten",
+}
 
-	for _, msg := range messages {
-		go func(msg string) {
-			defer wg.Done()
-			sink.PublishMessage(context.Background(), []byte(msg))
-		}(msg)
+var wg sync.WaitGroup
+wg.Add(len(messages))
+
+for _, msg := range messages {
+	go func(msg string) {
+		defer wg.Done()
+		sink.PublishMessage(context.Background(), []byte(msg))
+	}(msg)
+}
+
+wg.Wait()
+```
+
+### Simple
+Is an abstraction designed to provide a simpler interface for working with substrate. In the scenario a user simply 
+wants to consume messages from a source and either doesn't care about acks or is using something such as the 
+`ackordering` pkg, `simple` provides a smaller API designed to do just that.
+
+#### Example usage
+
+```go
+ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+defer cancel()
+
+asyncSource, err := kafka.NewAsyncMessageSource(kafka.AsyncMessageSourceConfig{
+	ConsumerGroup: "simple-consumer",
+	Brokers:       []string{"localhost:9092"},
+	Topic:         "example-topic",
+	Version:       "2.0.1",
+	Offset:        -2,
+})
+if err != nil {
+	panic(err)
+}
+
+msgFn := func(_ context.Context, msg substrate.Message) error {
+	println(string(msg.Data()))
+	return nil
+}
+
+asyncSource = ackordering.NewAsyncMessageSource(asyncSource)
+source := simple.NewAsyncMessageSource(ctx, asyncSource, simple.WithMsgFunc(msgFn))
+
+defer func() {
+	err := source.Close()
+	if err != nil {
+		panic(err)
 	}
+}()
 
-	wg.Wait()
+err = source.Run()
+if err != nil {
+	panic(err)
+}
 ```
 
 ## Other
