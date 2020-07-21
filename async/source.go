@@ -11,21 +11,21 @@ import (
 type MessageSourceOption func(msa *messageSourceAdapter)
 
 // WithSourceMsgBufferSize sets the msg channel buffer size. The default value is 0 (unbuffered).
-func WithSourceMsgBufferSize(size int) MessageSourceOption {
+func WithSourceMsgBufferSize(size uint) MessageSourceOption {
 	return func(msa *messageSourceAdapter) {
 		msa.msgBuffer = size
 	}
 }
 
 // WithSourceAckBufferSize sets the ack channel buffer size. The default value is 0 (unbuffered).
-func WithSourceAckBufferSize(size int) MessageSourceOption {
+func WithSourceAckBufferSize(size uint) MessageSourceOption {
 	return func(msa *messageSourceAdapter) {
 		msa.ackBuffer = size
 	}
 }
 
 // WithSourceConsumers sets the number of concurrent source consumers. The default value is 1 (synchronous).
-func WithSourceConsumers(consumers int) MessageSourceOption {
+func WithSourceConsumers(consumers uint) MessageSourceOption {
 	return func(msa *messageSourceAdapter) {
 		msa.consumers = consumers
 	}
@@ -71,9 +71,9 @@ func NewMessageSource(source substrate.AsyncMessageSource, opts ...MessageSource
 
 type messageSourceAdapter struct {
 	source    substrate.AsyncMessageSource
-	msgBuffer int
-	ackBuffer int
-	consumers int
+	msgBuffer uint
+	ackBuffer uint
+	consumers uint
 }
 
 func (a *messageSourceAdapter) ConsumeMessages(ctx context.Context, handler ConsumerMessageHandler) error {
@@ -86,7 +86,7 @@ func (a *messageSourceAdapter) ConsumeMessages(ctx context.Context, handler Cons
 		return a.source.ConsumeMessages(ctx, messages, acks)
 	})
 
-	for i := 0; i < a.consumers; i++ {
+	for i := uint(0); i < a.consumers; i++ {
 		rg.Go(func() error {
 			for {
 				select {

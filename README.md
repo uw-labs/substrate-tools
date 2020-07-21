@@ -12,6 +12,8 @@ Is an async message source wrapper that allows the user to utilise a handler pat
 with an async message source. It removes the need to manually handle the message and acknowledgement
 channels.
 
+See https://github.com/uw-labs/substrate-tools/tree/master/examples/async for example usage.
+
 ### Instrumented
 Provides wrappers for both message source and message sink that add prometheus metrics labeled with topic and status (either success or error).
 
