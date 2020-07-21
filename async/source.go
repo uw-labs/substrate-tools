@@ -7,6 +7,30 @@ import (
 	"github.com/uw-labs/sync/rungroup"
 )
 
+// MessageSourceOption is a function which sets a MessageSource configuration option.
+type MessageSourceOption func(msa *messageSourceAdapter)
+
+// WithSourceMsgBufferSize sets the msg channel buffer size. The default value is 0 (unbuffered).
+func WithSourceMsgBufferSize(size uint) MessageSourceOption {
+	return func(msa *messageSourceAdapter) {
+		msa.msgBuffer = size
+	}
+}
+
+// WithSourceAckBufferSize sets the ack channel buffer size. The default value is 0 (unbuffered).
+func WithSourceAckBufferSize(size uint) MessageSourceOption {
+	return func(msa *messageSourceAdapter) {
+		msa.ackBuffer = size
+	}
+}
+
+// WithSourceConsumers sets the number of concurrent source consumers. The default value is 1 (synchronous).
+func WithSourceConsumers(consumers uint) MessageSourceOption {
+	return func(msa *messageSourceAdapter) {
+		msa.consumers = consumers
+	}
+}
+
 // AckFunc is a function to call to send acknowledgement that a message was received. It should be
 // called at least once for each message read.
 type AckFunc func() error
@@ -32,59 +56,71 @@ type MessageSource interface {
 // NewMessageSource returns a new insurance asynchronous message source, given
 // an AsyncMessageSource. When Close is called on the AsyncMessageSource,
 // this is also propogated to the underlying AsyncMessageSource.
-func NewMessageSource(ams substrate.AsyncMessageSource) MessageSource {
-	return &messageSourceAdapter{
-		ams,
+func NewMessageSource(source substrate.AsyncMessageSource, opts ...MessageSourceOption) MessageSource {
+	msa := &messageSourceAdapter{
+		source:    source,
+		consumers: 1,
 	}
+
+	for _, opt := range opts {
+		opt(msa)
+	}
+
+	return msa
 }
 
 type messageSourceAdapter struct {
-	ac substrate.AsyncMessageSource
+	source    substrate.AsyncMessageSource
+	msgBuffer uint
+	ackBuffer uint
+	consumers uint
 }
 
 func (a *messageSourceAdapter) ConsumeMessages(ctx context.Context, handler ConsumerMessageHandler) error {
 	rg, ctx := rungroup.New(ctx)
 
-	messages := make(chan substrate.Message)
-	acks := make(chan substrate.Message)
+	messages := make(chan substrate.Message, a.msgBuffer)
+	acks := make(chan substrate.Message, a.ackBuffer)
 
 	rg.Go(func() error {
-		return a.ac.ConsumeMessages(ctx, messages, acks)
+		return a.source.ConsumeMessages(ctx, messages, acks)
 	})
 
-	rg.Go(func() error {
-		for {
-			select {
-			case msg := <-messages:
-				acked := false
-				ackFunc := func() error {
-					if acked {
-						return nil
+	for i := uint(0); i < a.consumers; i++ {
+		rg.Go(func() error {
+			for {
+				select {
+				case msg := <-messages:
+					acked := false
+					ackFunc := func() error {
+						if acked {
+							return nil
+						}
+						select {
+						case acks <- msg:
+							acked = true
+							return nil
+						case <-ctx.Done():
+							return ctx.Err()
+						}
 					}
-					select {
-					case acks <- msg:
-						acked = true
-						return nil
-					case <-ctx.Done():
-						return ctx.Err()
+					if err := handler(ctx, msg, ackFunc); err != nil {
+						return err
 					}
+				case <-ctx.Done():
+					return nil
 				}
-				if err := handler(ctx, msg, ackFunc); err != nil {
-					return err
-				}
-			case <-ctx.Done():
-				return nil
 			}
-		}
-	})
+		})
+	}
 
 	return rg.Wait()
 }
 
 func (a *messageSourceAdapter) Close() error {
-	return a.ac.Close()
+	return a.source.Close()
 }
 
 func (a *messageSourceAdapter) Status() (*substrate.Status, error) {
-	return a.ac.Status()
+	return a.source.Status()
 }
