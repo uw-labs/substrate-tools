@@ -24,10 +24,16 @@ It ensures that the acknowledgements are passed to the correct source.
 ### Flush
 Is a message flushing wrapper which blocks until all produced messages have been acked by the user. In the scenario that the user performs an action only after a message has been produced, the flushing wrapper provides a guarantee that such an action is only performed on a successful sink.
 
-#### Example usage
+```go
+import (
+	"github.com/uw-labs/substrate-tools/flush"
+)
+```
+
+#### Simple Example
 
 ```go
-asyncSink, err := kafka.NewAsyncMessageSink(kafka.AsyncMessageSinkConfig{
+sink, err := kafka.NewAsyncMessageSink(kafka.AsyncMessageSinkConfig{
 	Brokers: []string{"localhost:9092"},
 	Topic:   "example-topic",
 	Version: "2.0.1",
@@ -36,24 +42,28 @@ if err != nil {
 	panic(err)
 }
 
-ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-defer cancel()
+sink = instrumented.NewAsyncMessageSink(sink, prometheus.CounterOpts{
+	Name: "messages_produced_total",
+	Help: "The total count of messages produced",
+}, "topic")
 
-ackFn := flush.WithAckFunc(func(msg substrate.Message) error {
-	println(string(msg.Data()))
-	return nil
-})
-
-sink := flush.NewAsyncMessageSink(ctx, asyncSink, ackFn)
+flushSink := flush.NewAsyncMessageSink(context.Background(), sink)
 defer func() {
-	err := sink.Flush()
+	// Flush will block until all messages produced using `PublishMessage` have been acked
+	// by the AckFunc, if provided.
+	err := flushSink.Flush()
+	if err != nil {
+		panic(err)
+	}
+
+	err = flushSink.Close()
 	if err != nil {
 		panic(err)
 	}
 }()
 
 go func() {
-	err = sink.Run()
+	err = flushSink.Run()
 	if err != nil {
 		panic(err)
 	}
@@ -62,14 +72,6 @@ go func() {
 messages := []string{
 	"message one",
 	"message two",
-	"message three",
-	"message four",
-	"message five",
-	"message six",
-	"message seven",
-	"message eight",
-	"message nine",
-	"message ten",
 }
 
 var wg sync.WaitGroup
@@ -78,7 +80,88 @@ wg.Add(len(messages))
 for _, msg := range messages {
 	go func(msg string) {
 		defer wg.Done()
-		sink.PublishMessage(context.Background(), []byte(msg))
+
+		// This context is used to control the publishing of the message. This ctx
+		// could, and probably should, be different to the lifecyle context passed
+		// into the constructor.
+		err := flushSink.PublishMessage(context.Background(), []byte(msg))
+		if err != nil {
+			panic(err)
+		}
+	}(msg)
+}
+
+wg.Wait()
+```
+
+#### Complex example with Ack function and buffer sizes
+
+
+```go
+sink, err := kafka.NewAsyncMessageSink(kafka.AsyncMessageSinkConfig{
+	Brokers: []string{"localhost:9092"},
+	Topic:   "example-topic",
+	Version: "2.0.1",
+})
+if err != nil {
+	panic(err)
+}
+
+sink = instrumented.NewAsyncMessageSink(sink, prometheus.CounterOpts{
+	Name: "messages_produced_total",
+	Help: "The total count of messages produced",
+}, "topic")
+
+ackFn := flush.WithAckFunc(func(msg substrate.Message) error {
+	println(string(msg.Data()))
+	return nil
+})
+
+flushSink := flush.NewAsyncMessageSink(context.Background(), sink,
+	ackFn, flush.WithMsgBufferSize(50), flush.WithAckBufferSize(100))
+
+defer func() {
+	// Flush will block until all messages produced using `PublishMessage` have been acked
+	// by the AckFunc, if provided.
+	err := flushSink.Flush()
+	if err != nil {
+		panic(err)
+	}
+
+	err = flushSink.Close()
+	if err != nil {
+		panic(err)
+	}
+}()
+
+go func() {
+	// Run blocks until the sink is closed or an error occurs. If the AckFn retruns an error
+	// it will be returned by `Run`.
+	err = flushSink.Run()
+	if err != nil {
+		panic(err)
+	}
+}()
+
+messages := []string{
+	"message one",
+	"message two",
+}
+
+var wg sync.WaitGroup
+wg.Add(len(messages))
+
+for _, msg := range messages {
+	go func(msg string) {
+		defer wg.Done()
+
+		// This context is used to control the publishing of the message. This ctx
+		// could, and probably should, be different to the lifecyle context passed
+		// into the constructor.
+		err := flushSink.PublishMessage(context.Background(), []byte(msg))
+		if err != nil {
+			panic(err)
+		}
 	}(msg)
 }
 
