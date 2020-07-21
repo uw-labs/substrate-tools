@@ -2,11 +2,12 @@ package main
 
 import (
 	"context"
-	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/uw-labs/substrate"
 	"github.com/uw-labs/substrate-tools/ackordering"
 	"github.com/uw-labs/substrate-tools/async"
+	"github.com/uw-labs/substrate-tools/instrumented"
 	"github.com/uw-labs/substrate/kafka"
 )
 
@@ -23,6 +24,10 @@ func main() {
 	}
 
 	asyncSource = ackordering.NewAsyncMessageSource(asyncSource)
+	asyncSource = instrumented.NewAsyncMessageSource(asyncSource, prometheus.CounterOpts{
+		Name: "messages_consumed_total",
+		Help: "Total count of messages consumed",
+	}, "example-topic", "example-async-sync")
 
 	opts := []async.MessageSourceOption{
 		async.WithSourceConsumers(10),     // 10 concurrent message handlers
@@ -38,17 +43,13 @@ func main() {
 		}
 	}()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
 	handler := func(ctx context.Context, msg substrate.Message, ack async.AckFunc) error {
-		defer ack()
-
 		println("consumed:", string(msg.Data()))
-		return nil
+		return ack()
 	}
 
-	err = source.ConsumeMessages(ctx, handler)
+	// source.ConsumeMessages blocks. CTRL+C to exit.
+	err = source.ConsumeMessages(context.Background(), handler)
 	if err != nil {
 		panic(err)
 	}

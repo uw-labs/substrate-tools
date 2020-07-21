@@ -71,13 +71,10 @@ func TestConsumeMessagesSuccessfully(t *testing.T) {
 func TestConsumeMessagesSuccessfullyConcurrently(t *testing.T) {
 	receivedAcks := make(chan substrate.Message)
 
-	var wg sync.WaitGroup
-
 	source := messageSourceAdapter{
 		source: &messageSourceMock{
 			consumerMessagesMock: func(ctx context.Context, messages chan<- substrate.Message, acks <-chan substrate.Message) error {
 				for i := 0; i < 100; i++ {
-					wg.Add(1)
 					messages <- message.FromString("payload")
 				}
 
@@ -101,6 +98,9 @@ func TestConsumeMessagesSuccessfullyConcurrently(t *testing.T) {
 
 	errs := make(chan error)
 
+	var wg sync.WaitGroup
+	wg.Add(100)
+
 	go func() {
 		defer close(errs)
 		errs <- source.ConsumeMessages(sourceContext, func(_ context.Context, _ substrate.Message, ack AckFunc) error {
@@ -110,11 +110,15 @@ func TestConsumeMessagesSuccessfullyConcurrently(t *testing.T) {
 	}()
 
 	wg.Wait()
+	sourceCancel()
 
 	for {
 		select {
 		case err := <-errs:
-			assert.NoError(t, err)
+			if !errors.Is(err, context.Canceled) {
+				assert.NoError(t, err)
+			}
+
 			return
 		case ack := <-receivedAcks:
 			assert.NotEmpty(t, ack.Data())
