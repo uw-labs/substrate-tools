@@ -2,6 +2,7 @@ package instrumented
 
 import (
 	"context"
+	"errors"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/uw-labs/substrate"
@@ -58,7 +59,7 @@ func (ams *instrumentedSink) PublishMessages(ctx context.Context, acks chan<- su
 			case <-ctx.Done():
 				return <-errs
 			case err := <-errs:
-				if err != nil {
+				if isUnexpectedError(err) {
 					ams.counter.WithLabelValues("error", ams.topic).Inc()
 				}
 				return err
@@ -66,11 +67,23 @@ func (ams *instrumentedSink) PublishMessages(ctx context.Context, acks chan<- su
 		case <-ctx.Done():
 			return <-errs
 		case err := <-errs:
-			if err != nil {
+			if isUnexpectedError(err) {
 				ams.counter.WithLabelValues("error", ams.topic).Inc()
 			}
 			return err
 		}
+	}
+}
+
+func isUnexpectedError(err error) bool {
+	switch {
+	case err == nil:
+		return false
+	case errors.Is(err, context.Canceled):
+		// we're expecting producers to mark the stopping of producing by cancelling the context
+		return false
+	default:
+		return true
 	}
 }
 
