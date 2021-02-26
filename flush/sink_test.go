@@ -58,7 +58,7 @@ func TestAsyncMessageSinkSuccess(t *testing.T) {
 		go func(i int) {
 			defer wg.Done()
 
-			sink.PublishMessage(ctx, []byte(string('A'+i)))
+			sink.PublishMessage(ctx, []byte(string(rune('A'+i))))
 		}(i)
 	}
 
@@ -113,7 +113,7 @@ func TestAsyncMessageSinkInterruption(t *testing.T) {
 		go func(i int) {
 			defer wg.Done()
 
-			sink.PublishMessage(ctx, []byte(string('A'+i)))
+			sink.PublishMessage(ctx, []byte(string(rune('A'+i))))
 		}(i)
 	}
 
@@ -286,7 +286,7 @@ func benchmarkBufferSizes(b *testing.B, msgBufferSize, ackBufferSize int) {
 		go func(i int) {
 			defer wg.Done()
 
-			sink.PublishMessage(ctx, []byte(string('A'+i)))
+			sink.PublishMessage(ctx, []byte(string(rune('A'+i))))
 		}(i)
 	}
 
