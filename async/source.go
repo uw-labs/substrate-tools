@@ -25,6 +25,9 @@ func WithSourceAckBufferSize(size uint) MessageSourceOption {
 }
 
 // WithSourceConsumers sets the number of concurrent source consumers. The default value is 1 (synchronous).
+// Warning: When using Kafka (and possibly other backends), setting consumers > 1 breaks ordering guarantees
+// made possible by producing ordered events to a topic using a KeyFunc. If this is something you care about,
+// it's reccomended that you set this value to 1 and scale horizontally.
 func WithSourceConsumers(consumers uint) MessageSourceOption {
 	return func(msa *messageSourceAdapter) {
 		msa.consumers = consumers
