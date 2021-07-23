@@ -32,16 +32,16 @@ type MessageSource interface {
 // batchMessageSource type
 type MessageSourceOption func(r *batchMessageSource)
 
-// WithBatchSize specifies batch size. The default is 100.
-func WithBatchSize(batchSize int) MessageSourceOption {
+// WithSize specifies batch size. The default is 100.
+func WithSize(batchSize int) MessageSourceOption {
 	return func(r *batchMessageSource) {
 		r.batchSize = batchSize
 	}
 }
 
-// WithBatchMaxWait specifies the longest time the source should wait until it gets a full batch.
+// WithMaxWait specifies the longest time the source should wait until it gets a full batch.
 // After this time passes an incomplete batch will be passed to the callback. The default is 10s.
-func WithBatchMaxWait(batchMaxWait time.Duration) MessageSourceOption {
+func WithMaxWait(batchMaxWait time.Duration) MessageSourceOption {
 	return func(r *batchMessageSource) {
 		r.batchMaxWait = batchMaxWait
 	}

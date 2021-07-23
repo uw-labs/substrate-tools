@@ -61,8 +61,8 @@ func TestBatchMessageSource(t *testing.T) {
 		t.Run(tc.Name, func(t *testing.T) {
 			source := batch.NewMessageSource(
 				&mock.AsyncMessageSource{Messages: tc.Messages},
-				batch.WithBatchSize(tc.BatchSize),
-				batch.WithBatchMaxWait(time.Second),
+				batch.WithSize(tc.BatchSize),
+				batch.WithMaxWait(time.Second),
 			)
 
 			// Current issue with this test is it cancels the context after 3 seconds
